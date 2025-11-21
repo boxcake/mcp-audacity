@@ -1,5 +1,34 @@
 # Development Guide
 
+## Platform-Specific Named Pipes
+
+The server automatically detects your operating system and uses the appropriate named pipe paths:
+
+### Unix/Linux/macOS (FIFOs)
+- **Command Pipe**: `/tmp/audacity_script_pipe.to.501`
+- **Response Pipe**: `/tmp/audacity_script_pipe.from.501`
+- These are FIFO (First In, First Out) special files created by Audacity
+- Verification: `ls -l /tmp | grep audacity_script_pipe`
+
+### Windows (Named Pipes)
+- **Command Pipe**: `\\.\pipe\ToSrvPipe`
+- **Response Pipe**: `\\.\pipe\FromSrvPipe`
+- These are Windows named pipe objects created by Audacity
+- No file system verification needed; pipes exist in the pipe namespace
+
+### Environment Variable Override
+You can override the defaults on any platform:
+
+```bash
+# Unix/Linux/macOS
+export AUDACITY_PIPE_TO="/tmp/audacity_script_pipe.to.12345"
+export AUDACITY_PIPE_FROM="/tmp/audacity_script_pipe.from.12345"
+
+# Windows PowerShell
+$env:AUDACITY_PIPE_TO = "\\.\pipe\CustomToSrvPipe"
+$env:AUDACITY_PIPE_FROM = "\\.\pipe\CustomFromSrvPipe"
+```
+
 ## Audacity Scripting Quick Reference
 
 ### Key Concepts
@@ -9,6 +38,7 @@
 3. **JSON Support**: `GetInfo` commands can return structured JSON
 4. **No Undo**: Scripted commands don't appear in undo history
 5. **Label-Based Analysis**: Many analyzers output results as labels
+6. **Cross-Platform**: Named pipes work differently on Windows vs Unix-like systems
 
 ### Common Command Patterns
 
@@ -236,25 +266,41 @@ tail -f /tmp/audacity_script_pipe.to.501
 
 ### Connection Issues
 
-**Error: Failed to connect to Audacity: [Errno 61] Connection refused**
+**Error: Failed to connect to Audacity: [Errno 61] Connection refused** (macOS/Linux)
 - Ensure mod-script-pipe is enabled in Audacity preferences
 - Check that Audacity is running
 - Verify pipe files exist: `ls /tmp/audacity_script_pipe*`
-- Check for number suffixes on pipe names
+- Check for number suffixes on pipe names (e.g., `.to.12345`)
+- Set environment variables if pipes have different numbers
+
+**Error: [WinError 2] The system cannot find the file specified** (Windows)
+- Ensure mod-script-pipe is enabled in Audacity preferences
+- Check that Audacity is running
+- Restart Audacity after enabling mod-script-pipe
+- Verify Audacity version supports mod-script-pipe (3.x or later)
 
 **Error: spawn uv ENOENT**
 - Use absolute path to `uv` in Claude Desktop config
-- Verify `uv` is installed: `which uv`
+- Verify `uv` is installed: `which uv` (Unix) or `where uv` (Windows)
 
 ### Pipe Issues
 
-**Pipes have number suffixes**
-- Update `PIPE_TO` and `PIPE_FROM` constants in code
-- Eventually make this configurable via environment variables
+**Pipes have number suffixes (macOS/Linux)**
+- Use environment variables to specify the correct paths:
+  ```bash
+  export AUDACITY_PIPE_TO="/tmp/audacity_script_pipe.to.12345"
+  export AUDACITY_PIPE_FROM="/tmp/audacity_script_pipe.from.12345"
+  ```
 
-**Permission denied on pipes**
+**Permission denied on pipes (macOS/Linux)**
 - Check pipe permissions: `ls -l /tmp/audacity_script_pipe*`
 - Ensure user has read/write access
+- Pipes should have permissions like `prw-------` (0600)
+
+**Named pipe not found (Windows)**
+- Ensure Audacity has been restarted after enabling mod-script-pipe
+- Check Windows Event Viewer for Audacity errors
+- Try running Audacity as Administrator (though normally not required)
 
 ## Future Enhancements (Phase 2)
 

@@ -17,6 +17,7 @@ This project implements an MCP (Model Context Protocol) server that connects to 
 ## Features
 
 - **Audacity Integration:** Communicates with Audacity using the mod‑script‑pipe interface via named pipes.
+- **Cross-Platform:** Automatic platform detection for Windows, macOS, and Linux pipe paths.
 - **Comprehensive Command Set:** Provides 150+ MCP tool endpoints for all Audacity scripting commands including:
   - File operations (New, Open, Save, Export)
   - Transport controls (Play, Pause, Record)
@@ -83,24 +84,36 @@ Make sure your project folder contains at least:
 - Restart Audacity.
 
 **Step 2: Verify Named Pipes**
-- Audacity should create two named pipes (by default on macOS/Linux):
- - Command pipe: `/tmp/audacity_script_pipe.to.%number%`
- - Response pipe: `/tmp/audacity_script_pipe.from.%number%`
-- Run the following command in a terminal to verify:
 
-   ```
+Audacity creates two named pipes that differ by platform:
+
+**On macOS/Linux:**
+ - Command pipe: `/tmp/audacity_script_pipe.to.501`
+ - Response pipe: `/tmp/audacity_script_pipe.from.501`
+ - Run this command in a terminal to verify:
+   ```bash
    ls -l /tmp | grep audacity_script_pipe
    ```
-> If you see extra numbers or characters (e.g. `/tmp/audacity_script_pipe.to.1234`), see the [Server Configuration](#server-configuration) section below to customize the pipe paths.
+
+**On Windows:**
+ - Command pipe: `\\.\pipe\ToSrvPipe`
+ - Response pipe: `\\.\pipe\FromSrvPipe`
+ - These are created automatically by Audacity when mod-script-pipe is enabled
+
+> **Note:** The server automatically detects your platform and uses the correct pipe paths. If your system uses different paths (e.g., `/tmp/audacity_script_pipe.to.1234` on macOS/Linux), see the [Server Configuration](#server-configuration) section to customize them.
 
 ## Server Configuration
 
-The server can be configured using environment variables to match your system's pipe paths and adjust behavior.
+The server automatically detects your platform and uses appropriate default pipe paths. You can override these using environment variables if your system uses different paths.
 
 ### Environment Variables
 
-- **`AUDACITY_PIPE_TO`**: Path to the command pipe (default: `/tmp/audacity_script_pipe.to.501`)
-- **`AUDACITY_PIPE_FROM`**: Path to the response pipe (default: `/tmp/audacity_script_pipe.from.501`)
+- **`AUDACITY_PIPE_TO`**: Path to the command pipe
+  - Default on macOS/Linux: `/tmp/audacity_script_pipe.to.501`
+  - Default on Windows: `\\.\pipe\ToSrvPipe`
+- **`AUDACITY_PIPE_FROM`**: Path to the response pipe
+  - Default on macOS/Linux: `/tmp/audacity_script_pipe.from.501`
+  - Default on Windows: `\\.\pipe\FromSrvPipe`
 - **`AUDACITY_COMMAND_TIMEOUT`**: Time in seconds to wait after sending a command (default: `0.2`)
 
 ### Setting Environment Variables
@@ -111,6 +124,28 @@ The server can be configured using environment variables to match your system's 
 # Set for current session
 export AUDACITY_PIPE_TO="/tmp/audacity_script_pipe.to.12345"
 export AUDACITY_PIPE_FROM="/tmp/audacity_script_pipe.from.12345"
+
+# Then run the server
+uv run audacity_mcp_server.py
+```
+
+**On Windows (PowerShell):**
+
+```powershell
+# Set for current session
+$env:AUDACITY_PIPE_TO = "\\.\pipe\ToSrvPipe"
+$env:AUDACITY_PIPE_FROM = "\\.\pipe\FromSrvPipe"
+
+# Then run the server
+uv run audacity_mcp_server.py
+```
+
+**On Windows (Command Prompt):**
+
+```cmd
+# Set for current session
+set AUDACITY_PIPE_TO=\\.\pipe\ToSrvPipe
+set AUDACITY_PIPE_FROM=\\.\pipe\FromSrvPipe
 
 # Then run the server
 uv run audacity_mcp_server.py
@@ -141,17 +176,25 @@ Add environment variables to your `claude_desktop_config.json`:
 ```
 
 ## Usage
-- Running the MCP Server from the Command Line
+
+### Running the MCP Server from the Command Line
+
 **1. Navigate to Your Project Directory:**
 
-   ```MacOS
-   cd /%path_to_project%/mcp-audacity
+   ```bash
+   cd /path/to/mcp-audacity
    ```
 
 **2. Activate the Virtual Environment (if not already activated):**
 
-   ```MacOS
+   On macOS/Linux:
+   ```bash
    source .venv/bin/activate
+   ```
+
+   On Windows:
+   ```cmd
+   .venv\Scripts\activate
    ```
 
 **3. Launch the Server with the uv Tool:**
@@ -162,10 +205,19 @@ Add environment variables to your `claude_desktop_config.json`:
 
 You should see log messages such as:
 
+   On macOS/Linux:
    ```
    INFO - Audacity MCP server starting up
    INFO - Looking for pipes: TO=/tmp/audacity_script_pipe.to.501, FROM=/tmp/audacity_script_pipe.from.501
    INFO - Opened Audacity mod-script-pipe: /tmp/audacity_script_pipe.to.501
+   INFO - Connected to Audacity mod-script-pipe
+   ```
+
+   On Windows:
+   ```
+   INFO - Audacity MCP server starting up
+   INFO - Looking for pipes: TO=\\.\pipe\ToSrvPipe, FROM=\\.\pipe\FromSrvPipe
+   INFO - Opened Audacity mod-script-pipe: \\.\pipe\ToSrvPipe
    INFO - Connected to Audacity mod-script-pipe
    ```
 

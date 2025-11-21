@@ -1,10 +1,12 @@
 """Audacity mod-script-pipe client.
 
 This module provides a client for communicating with Audacity via its
-mod-script-pipe interface using named pipes (FIFOs).
+mod-script-pipe interface using named pipes (FIFOs on Unix/Linux/macOS,
+named pipes on Windows).
 """
 
 import os
+import platform
 import time
 import logging
 from typing import Optional, TextIO
@@ -13,9 +15,32 @@ from .exceptions import AudacityConnectionError, AudacityCommandError
 
 logger = logging.getLogger(__name__)
 
-# Configuration constants
-DEFAULT_PIPE_TO = "/tmp/audacity_script_pipe.to.501"
-DEFAULT_PIPE_FROM = "/tmp/audacity_script_pipe.from.501"
+
+def _get_default_pipe_paths() -> tuple[str, str]:
+    """Get default pipe paths based on the current platform.
+
+    Returns:
+        Tuple of (to_pipe, from_pipe) paths appropriate for the platform.
+
+    Note:
+        - Unix/Linux/macOS: /tmp/audacity_script_pipe.to.501 (and .from.501)
+        - Windows: \\\\.\\pipe\\ToSrvPipe (and FromSrvPipe)
+    """
+    system = platform.system()
+
+    if system == "Windows":
+        # Windows named pipe paths
+        return (r"\\.\pipe\ToSrvPipe", r"\\.\pipe\FromSrvPipe")
+    else:
+        # Unix/Linux/macOS FIFO paths
+        return (
+            "/tmp/audacity_script_pipe.to.501",
+            "/tmp/audacity_script_pipe.from.501",
+        )
+
+
+# Get platform-appropriate defaults
+DEFAULT_PIPE_TO, DEFAULT_PIPE_FROM = _get_default_pipe_paths()
 DEFAULT_COMMAND_TIMEOUT = 0.2  # seconds to wait after sending command
 
 
@@ -23,11 +48,15 @@ class AudacityConnection:
     """Manages communication with Audacity via mod-script-pipe.
 
     This class handles the low-level communication with Audacity using named
-    pipes (FIFOs). It provides methods to connect, disconnect, and send
-    commands to Audacity.
+    pipes (FIFOs on Unix/Linux/macOS, named pipes on Windows). It provides
+    methods to connect, disconnect, and send commands to Audacity.
 
     The connection is designed to be resilient and will attempt to reconnect
     if the connection is lost during command execution.
+
+    Platform-specific pipe paths are automatically detected:
+    - Unix/Linux/macOS: /tmp/audacity_script_pipe.to.501 (and .from.501)
+    - Windows: \\\\.\\pipe\\ToSrvPipe (and FromSrvPipe)
 
     Attributes:
         to_pipe: Path to the pipe for sending commands to Audacity.
