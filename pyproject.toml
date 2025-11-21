@@ -58,6 +58,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 py-modules = ["audacity_mcp_server"]
+packages = ["audacity"]
 
 [tool.ruff]
 line-length = 88
