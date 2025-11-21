@@ -8,18 +8,24 @@ This project implements an MCP (Model Context Protocol) server that connects to 
 2. [Requirements](#requirements)
 3. [Installation and Setup](#installation-and-setup)
 4. [Configuring Audacity](#configuring-audacity)
-5. [Usage](#usage)
-6. [Configuration with Claude Desktop Client](#configuration-with-claude-desktop-client)
-7. [Troubleshooting](#troubleshooting)
-8. [License](#license)
+5. [Server Configuration](#server-configuration)
+6. [Usage](#usage)
+7. [Configuration with Claude Desktop Client](#configuration-with-claude-desktop-client)
+8. [Troubleshooting](#troubleshooting)
+9. [License](#license)
 
 ## Features
 
 - **Audacity Integration:** Communicates with Audacity using the mod‑script‑pipe interface via named pipes.
-- **MCP Endpoints:** Provides MCP tool endpoints to:
-  - Retrieve Audacity status.
-  - Start and stop recording.
-  - Play and pause playback.
+- **Comprehensive Command Set:** Provides 150+ MCP tool endpoints for all Audacity scripting commands including:
+  - File operations (New, Open, Save, Export)
+  - Transport controls (Play, Pause, Record)
+  - Audio editing (Cut, Copy, Paste, Trim)
+  - Effects (Normalize, Amplify, NoiseReduction, etc.)
+  - Labels and track management
+  - Analysis tools and generators
+- **Configurable:** Support for environment variables to customize pipe paths and timeouts.
+- **Type-Safe:** Full type hints and comprehensive documentation.
 - **uv Integration:** Uses the `uv` tool to run the MCP server.
 - **Claude Desktop Compatibility:** Can be configured to launch using the Claude Desktop client.
 
@@ -56,10 +62,11 @@ This project implements an MCP (Model Context Protocol) server that connects to 
    uv add "mcp[cli]" httpx
    ```
 
-4. **Verify the Project Structure**  
+4. **Verify the Project Structure**
 Make sure your project folder contains at least:
-- `audacity_mcp_pipe.py` (the main MCP server script)
+- `audacity_mcp_server.py` (the main MCP server script)
 - `pyproject.toml` (project configuration)
+- `CLAUDE.md` and `DEVELOPMENT.md` (development documentation)
 - (Optional) `claude_desktop_config.json` (for integration with the Claude Desktop client)
 
 ## Configuring-Audacity
@@ -84,7 +91,54 @@ Make sure your project folder contains at least:
    ```
    ls -l /tmp | grep audacity_script_pipe
    ```
-> If you see extra numbers or characters (e.g. `/tmp/audacity_script_pipe.to.1234`), update the pipe paths in your `audacity_mcp_pipe.py` accordingly.
+> If you see extra numbers or characters (e.g. `/tmp/audacity_script_pipe.to.1234`), see the [Server Configuration](#server-configuration) section below to customize the pipe paths.
+
+## Server Configuration
+
+The server can be configured using environment variables to match your system's pipe paths and adjust behavior.
+
+### Environment Variables
+
+- **`AUDACITY_PIPE_TO`**: Path to the command pipe (default: `/tmp/audacity_script_pipe.to.501`)
+- **`AUDACITY_PIPE_FROM`**: Path to the response pipe (default: `/tmp/audacity_script_pipe.from.501`)
+- **`AUDACITY_COMMAND_TIMEOUT`**: Time in seconds to wait after sending a command (default: `0.2`)
+
+### Setting Environment Variables
+
+**On macOS/Linux:**
+
+```bash
+# Set for current session
+export AUDACITY_PIPE_TO="/tmp/audacity_script_pipe.to.12345"
+export AUDACITY_PIPE_FROM="/tmp/audacity_script_pipe.from.12345"
+
+# Then run the server
+uv run audacity_mcp_server.py
+```
+
+**For Claude Desktop Client:**
+
+Add environment variables to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "audacity": {
+      "command": "/absolute/path/to/uv",
+      "args": [
+        "--directory",
+        "/path/to/mcp-audacity",
+        "run",
+        "audacity_mcp_server.py"
+      ],
+      "env": {
+        "AUDACITY_PIPE_TO": "/tmp/audacity_script_pipe.to.12345",
+        "AUDACITY_PIPE_FROM": "/tmp/audacity_script_pipe.from.12345"
+      }
+    }
+  }
+}
+```
 
 ## Usage
 - Running the MCP Server from the Command Line
@@ -100,30 +154,40 @@ Make sure your project folder contains at least:
    source .venv/bin/activate
    ```
 
-**3. Launch the Server with the uv Tool:** 
+**3. Launch the Server with the uv Tool:**
 
-   ```MacOS
-   uv run audacity_mcp_pipe.py
+   ```bash
+   uv run audacity_mcp_server.py
    ```
 
-- You should see log messages such as:
+You should see log messages such as:
 
-   ```MacOS
-   2025-04-13 19:36:32,759 - AudacityMCPServer - INFO - Audacity MCP server starting up
-   2025-04-13 19:36:32,760 - AudacityMCPServer - INFO - Opened Audacity mod-script-pipe
-   2025-04-13 19:36:32,762 - AudacityMCPServer - INFO - Connected to Audacity mod-script-pipe
+   ```
+   INFO - Audacity MCP server starting up
+   INFO - Looking for pipes: TO=/tmp/audacity_script_pipe.to.501, FROM=/tmp/audacity_script_pipe.from.501
+   INFO - Opened Audacity mod-script-pipe: /tmp/audacity_script_pipe.to.501
+   INFO - Connected to Audacity mod-script-pipe
    ```
 
 ## MCP Endpoints
-- Your MCP server exposes several endpoints that can be invoked by an MCP client. For example:
 
-- get_status: Retrieves Audacity status.
-- start_recording: Starts recording.
-- stop_recording: Stops recording.
-- play: Starts playback.
-- pause: Pauses playback.  
+The MCP server exposes 150+ tool endpoints that can be invoked by an MCP client, organized into the following categories:
 
-- These endpoints are defined in `audacity_mcp_pipe.py` and can be triggered using an MCP client.
+- **File Operations**: New, Open, Close, Save, SaveAs, ExportAudio, etc.
+- **Import**: ImportAudio, ImportLabels, ImportMIDI, ImportRaw
+- **Edit**: Undo, Redo, Cut, Copy, Paste, Delete, Duplicate, Silence, Trim
+- **Labels**: AddLabel, EditLabels, PasteNewLabel, TypeToCreateLabel
+- **Selection**: SelectAll, SelectNone, ZeroCross, StoreCursorPosition
+- **View**: ZoomIn, ZoomOut, ZoomSel, ShowClipping, MixerBoard
+- **Transport**: PlayStop, Pause, Record1stChoice, Record2ndChoice, Scrub
+- **Effects**: Amplify, Normalize, NoiseReduction, Compressor, Echo, Reverb, FadeIn, FadeOut, and 20+ more
+- **Generate**: Tone, Noise, Chirp, DtmfTones, Pluck, RhythmTrack
+- **Analyze**: ContrastAnalyser, PlotSpectrum, ManageAnalyzers
+- **Tools**: ManageMacros, ApplyMacro, Screenshot
+- **Track Controls**: TrackMute, TrackSolo, TrackGain, TrackPan, TrackMove operations
+- **Scriptables I & II**: Advanced commands like Select, SetTrackStatus, GetInfo, SetLabel, Export2, Import2
+
+All endpoints are defined in `audacity_mcp_server.py` and correspond to Audacity's scripting commands. For detailed command documentation, see the [Audacity Scripting Reference](https://manual.audacityteam.org/man/scripting_reference.html).
 
 ## Configuration with Claude Desktop Client
 - If you want to run your server via the Claude Desktop client, update your `claude_desktop_config.json` to point to this project. For example:
