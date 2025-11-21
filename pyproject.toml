@@ -1,7 +1,7 @@
 [project]
 name = "audacity-mcp"
-version = "0.2.0"
-description = "MCP server to control Audacity via mod-script-pipe with comprehensive scripting commands"
+version = "0.3.0"
+description = "MCP server to control Audacity via mod-script-pipe with comprehensive scripting commands and high-level helpers"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
